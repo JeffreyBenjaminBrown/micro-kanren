@@ -1,0 +1,4 @@
+* User must inverse-eta-delay recursive goals.
+I think that means wrap them in either Delay or zzz.
+* TODO What is a "serious goal"?
+* TODO grok section 4.2

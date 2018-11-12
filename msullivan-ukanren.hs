@@ -17,7 +17,8 @@ type Program = State -> KList State -- ^ the paper calls `Program`s "goals"
 data Term = Atom String | Pair Term Term | Var Var deriving Show
 
 -- Unlike the original paper, in Haskell we don't need to eta-expand.
--- We just need to add some sort of marker.
+-- We just need to add a marker.
+-- TODO (#grok) That marker is the Delay constructor, right?
 data KList a = Nil | Cons a (KList a) | Delay (KList a)
   deriving (Show, Eq, Ord, Functor)
 
@@ -34,13 +35,13 @@ instance Monad KList where
   return = pure
   Nil >>= f = Nil
   x `Cons` xs >>= f = f x `mplus` (xs >>= f)
-  Delay xs >>= f = Delay (xs >>= f)
+  Delay xs >>= f = Delay $ xs >>= f
 
 instance MonadPlus KList where
   mzero = Nil
   Nil `mplus` xs = xs
   (x `Cons` xs) `mplus` ys = x `Cons` (ys `mplus` xs) -- swapped per sect. 6
-  Delay xs `mplus` ys = Delay $ ys `mplus` xs
+  Delay xs `mplus` ys = Delay $ ys `mplus` xs -- also swapped
 
 -- Apply a substitution to the top level of a term
 -- See `unify` for why we do not need to address the case of a Pair input.
@@ -68,7 +69,8 @@ unify u v s = go (walk u s) (walk v s) where
 zzz :: Program -> Program
 zzz g = \sc -> Delay $ g sc
 
--- | TODO (#extend) check for, prohibit circularities
+-- | TODO (#extend) use an "occurs check" to prohibit circularities.
+-- (Example in paper.)
 equiv :: Term -> Term -> Program
 equiv u v = \(s, c) -> case unify u v s of
   Nothing -> mzero
@@ -93,6 +95,9 @@ klistToList (x `Cons` xs) = x : klistToList xs
 empty_state :: State -- ^ The first variable used is always 0.
 empty_state = ([], 0)
 
+six :: Program
+six = callFresh $ \x -> equiv x $ Atom "6"
+
 five :: Program
 five = callFresh $ \x -> equiv x $ Atom "5"
 
@@ -113,5 +118,5 @@ a_and_b = conj
           (callFresh $ \a -> equiv a (Atom "7"))
           (callFresh $ \b -> disj (equiv b $ Atom "5") (equiv b $ Atom "6"))
 
-runTest :: (State -> KList a) -> [a]
+runTest :: Program -> [State]
 runTest p = klistToList $ p empty_state
