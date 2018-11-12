@@ -6,12 +6,13 @@
 
 import Control.Applicative
 import Control.Monad
+import qualified Data.Map as M
 
 
-type Var = Integer
+type Var = Int
 type Subst = [(Var, Term)]
-type State = (Subst, Var)
-type Program = State -> KList State
+type State = (Subst, Int) -- ^ TODO (#grok) Int because not a Var yet?
+type Program = State -> KList State -- ^ the paper calls `Program`s "goals"
 
 data Term = Atom String | Pair Term Term | Var Var deriving Show
 
@@ -54,21 +55,20 @@ extS v t = (:) (v, t)
 -- Try to unify two terms under a Subst;
 -- return an extended Subst if it succeeds.
 unify :: Term -> Term -> Subst -> Maybe Subst
-unify u v s = go (walk u s) (walk v s)
-  where go (Var v1) (Var v2) | v1 == v2 = return s
-        go (Var v) t = return $ extS v t s
-        go t (Var v) = return $ extS v t s
-        go (Pair u1 u2) (Pair v1 v2) =
-          do s' <- unify u1 v1 s
-             unify u2 v2 s'
-        go (Atom a1) (Atom a2) | a1 == a2 = return s
-        go _ _  = mzero
+unify u v s = go (walk u s) (walk v s) where
+  go (Var v1) (Var v2) | v1 == v2 = return s
+  go (Var v) t = return $ extS v t s
+  go t (Var v) = return $ extS v t s
+  go (Pair u1 u2) (Pair v1 v2) = unify u1 v1 s >>= unify u2 v2
+  go (Atom a1) (Atom a2) | a1 == a2 = return s
+  go _ _  = mzero
 
 
 -- | = MicroKanren program formers
 zzz :: Program -> Program
 zzz g = \sc -> Delay $ g sc
 
+-- | TODO (#extend) check for, prohibit circularities
 equiv :: Term -> Term -> Program
 equiv u v = \(s, c) -> case unify u v s of
   Nothing -> mzero
@@ -90,7 +90,7 @@ klistToList (x `Cons` xs) = x : klistToList xs
 
 
 -- | = Test cases
-empty_state :: State
+empty_state :: State -- ^ The first variable used is always 0.
 empty_state = ([], 0)
 
 five :: Program
