@@ -2,8 +2,6 @@
 -- Had a little accompanying text in a blog:
   -- https://www.msully.net/blog/2015/02/26/microkanren-%CE%BCkanren-in-haskell/
 
-{-# LANGUAGE DeriveFunctor #-}
-
 import Control.Applicative
 import Control.Monad
 import qualified Data.Map as M
@@ -20,13 +18,18 @@ data Term = Atom String | Pair Term Term | Var Var deriving Show
 -- We just need to add a marker.
 -- TODO (#grok) That marker is the Delay constructor, right?
 data KList a = Nil | Cons a (KList a) | Delay (KList a)
-  deriving (Show, Eq, Ord, Functor)
+  deriving (Show, Eq, Ord)
+
+instance Functor KList where
+  fmap _ Nil = Nil
+  fmap f (Cons a as) = Cons (f a) $ fmap f as
+  fmap f (Delay as) = Delay $ fmap f as
 
 instance Applicative KList where
   pure a = Cons a Nil
   (<*>) _ _ = error "<*> undefined for KList."
     -- TODO (#grok) Should `<*>` mean something for `KList`s?
--- <<< types >>>
+
 instance Alternative KList where
   empty = Nil
   (<|>) = mplus -- TODO (#grok) ? This is just a guess.
@@ -115,8 +118,39 @@ fivesRev = callFresh fivesRev_
 
 a_and_b :: Program
 a_and_b = conj
-          (callFresh $ \a -> equiv a (Atom "7"))
+          (callFresh $ \a -> equiv a $ Atom "7")
           (callFresh $ \b -> disj (equiv b $ Atom "5") (equiv b $ Atom "6"))
 
 runTest :: Program -> [State]
 runTest p = klistToList $ p empty_state
+
+
+-- | = reify
+--
+-- TODO : Why I think this is broken:
+-- > mK_reify $ runTest $ conj five six
+-- [Atom "5"]
+-- > runTest $ conj five six
+-- [([(1,Atom "6"),(0,Atom "5")],2)]
+
+walk' :: Term -> Subst -> Term
+walk' t s = let v = walk t s
+  in case v of Pair p q -> Pair (walk' p s) (walk' q s)
+               _        -> v
+
+mK_reify :: Functor f => f State -> f Term
+mK_reify = fmap reify_head
+
+reify_head :: State ->  Term -- TODO (#safe) accept Subst, not State
+reify_head (s,_) = let v = walk' (Var 0) s
+  in walk' v $ reify_s v []
+
+reify_s :: Term -> Subst -> Subst
+reify_s t s = let t' = walk t s in case t' of
+  Var v    -> let n = reify_name $ length s
+              in (v, Atom n) : s
+  Pair p q -> reify_s q $ reify_s p s
+  _        -> s
+
+reify_name :: Int -> String
+reify_name i = "symbol " ++ show i
