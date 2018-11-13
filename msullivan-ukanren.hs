@@ -1,6 +1,6 @@
--- Based on Hennan and Friedman's original microKanren paper.
--- Had a little accompanying text in a blog:
-  -- https://www.msully.net/blog/2015/02/26/microkanren-%CE%BCkanren-in-haskell/
+-- | Based on Hennan and Friedman's original microKanren paper.
+-- The bulk of this came from Michael J Sullivan's blog:
+-- https://www.msully.net/blog/2015/02/26/microkanren-%CE%BCkanren-in-haskell/
 
 import Control.Applicative
 import Control.Monad
@@ -12,9 +12,13 @@ type Subst = [(Var, Term)]
 type State = (Subst, Int) -- ^ TODO (#grok) Int because not a Var yet?
 type Program = State -> KList State -- ^ the paper calls `Program`s "goals"
 
+-- | From the paper: "terms of the language consist of variables, objects
+-- deemed identical under eqv?, and pairs of the foregoing".
+-- TODO (#grok) Where do Pairs come from? What are they for?
+-- (No function below generates a Pair except in response to one.)
 data Term = Atom String | Pair Term Term | Var Var deriving Show
 
--- Unlike the original paper, in Haskell we don't need to eta-expand.
+-- | Unlike the original paper, in Haskell we don't need to eta-expand.
 -- We just need to add a marker.
 -- TODO (#grok) That marker is the Delay constructor, right?
 data KList a = Nil | Cons a (KList a) | Delay (KList a)
@@ -36,18 +40,20 @@ instance Alternative KList where
 
 instance Monad KList where
   return = pure
-  Nil >>= f = Nil
+  Nil         >>= f = Nil
   x `Cons` xs >>= f = f x `mplus` (xs >>= f)
-  Delay xs >>= f = Delay $ xs >>= f
+  Delay xs    >>= f = Delay       (xs >>= f)
 
+-- | Unlike (++), `mplus` swaps order, to interleave processes.
 instance MonadPlus KList where
   mzero = Nil
-  Nil `mplus` xs = xs
-  (x `Cons` xs) `mplus` ys = x `Cons` (ys `mplus` xs) -- swapped per sect. 6
-  Delay xs `mplus` ys = Delay $ ys `mplus` xs -- also swapped
+  Nil           `mplus` xs = xs
+  (x `Cons` xs) `mplus` ys = x `Cons` (ys `mplus` xs)
+  Delay      xs `mplus` ys = Delay    (ys `mplus` xs)
 
--- Apply a substitution to the top level of a term
+-- | Apply a substitution to the top level of a term.
 -- See `unify` for why we do not need to address the case of a Pair input.
+-- See `walk'` for something that does.
 walk :: Term -> Subst -> Term
 walk (Var v) s = case lookup v s of Nothing -> Var v
                                     Just us -> walk us s
@@ -56,16 +62,16 @@ walk t s = t
 extS :: Var -> Term -> Subst -> Subst
 extS v t = (:) (v, t)
 
--- Try to unify two terms under a Subst;
--- return an extended Subst if it succeeds.
+-- | Try to unify two terms under a Subst.
+-- Return an extended Subst if it succeeds.
 unify :: Term -> Term -> Subst -> Maybe Subst
 unify u v s = go (walk u s) (walk v s) where
-  go (Var v1) (Var v2) | v1 == v2 = return s
-  go (Var v) t = return $ extS v t s
-  go t (Var v) = return $ extS v t s
-  go (Pair u1 u2) (Pair v1 v2) = unify u1 v1 s >>= unify u2 v2
-  go (Atom a1) (Atom a2) | a1 == a2 = return s
-  go _ _  = mzero
+  go (Var v1)     (Var v2) | v1 == v2   = return s
+  go (Var v)      t                     = return $ extS v t s
+  go t            (Var v)               = return $ extS v t s
+  go (Pair u1 u2) (Pair v1 v2)          = unify u1 v1 s >>= unify u2 v2
+  go (Atom a1)    (Atom a2) | a1 == a2  = return s
+  go _            _                     = mzero
 
 
 -- | = MicroKanren program formers
@@ -89,9 +95,9 @@ conj :: Program -> Program -> Program
 conj g1 g2 = \sc -> g1 sc >>= g2
 
 klistToList :: KList a -> [a]
-klistToList Nil = []
-klistToList (Delay xs) = klistToList xs
-klistToList (x `Cons` xs) = x : klistToList xs
+klistToList Nil            = []
+klistToList (Delay xs)     = klistToList xs
+klistToList (x `Cons` xs)  = x : klistToList xs
 
 
 -- | = Test cases
@@ -153,4 +159,4 @@ reify_s t s = let t' = walk t s in case t' of
   _        -> s
 
 reify_name :: Int -> String
-reify_name i = "symbol " ++ show i
+reify_name i = "_." ++ show i
