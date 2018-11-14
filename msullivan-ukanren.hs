@@ -15,7 +15,10 @@ type Program = State -> KList State -- ^ the paper calls `Program`s "goals"
 -- | From the paper: "terms of the language consist of variables, objects
 -- deemed identical under eqv?, and pairs of the foregoing".
 -- TODO (#grok) Where do Pairs come from? What are they for?
--- (No function below generates a Pair except in response to one.)
+  -- No function below generates a Pair except in response to one.
+  -- If I comment out every mention of them, the tests still run fine.
+  -- This stackoverflow question suggests it means lists, not pairs.
+  -- https://stackoverflow.com/questions/28658148/microkanren-what-are-the-terms
 data Term = Atom String | Pair Term Term | Var Var deriving Show
 
 -- | Unlike the original paper, in Haskell we don't need to eta-expand.
@@ -133,11 +136,13 @@ runTest p = klistToList $ p empty_state
 
 -- | = reify
 --
--- TODO : Why I think this is broken:
--- > mK_reify $ runTest $ conj five six
--- [Atom "5"]
--- > runTest $ conj five six
--- [([(1,Atom "6"),(0,Atom "5")],2)]
+-- To the extent possible, I copied this code from the original Scheme paper.
+--
+-- TODO : Reification seems broken:
+  -- > mK_reify $ runTest $ conj five six
+  -- [Atom "5"]
+  -- > runTest $ conj five six
+  -- [([(1,Atom "6"),(0,Atom "5")],2)]
 
 walk' :: Term -> Subst -> Term
 walk' t s = let v = walk t s

@@ -1,4 +1,5 @@
-* TODO What is "Pair" for?
+* TODO What is "Pair" for? 
+(See code for details.)
 * User must inverse-eta-delay recursive goals.
 I think that means wrap them in either Delay or zzz.
 * TODO What is a "serious goal"?
