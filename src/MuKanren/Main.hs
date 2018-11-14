@@ -1,6 +1,4 @@
--- | Based on Hennan and Friedman's original microKanren paper.
--- The bulk of this came from Michael J Sullivan's blog:
--- https://www.msully.net/blog/2015/02/26/microkanren-%CE%BCkanren-in-haskell/
+module MuKanren.Main where
 
 import Control.Applicative
 import Control.Monad
@@ -101,67 +99,3 @@ klistToList :: KList a -> [a]
 klistToList Nil            = []
 klistToList (Delay xs)     = klistToList xs
 klistToList (x `Cons` xs)  = x : klistToList xs
-
-
--- | = Test cases
-empty_state :: State -- ^ The first variable used is always 0.
-empty_state = ([], 0)
-
-six :: Program
-six = callFresh $ \x -> equiv x $ Atom "6"
-
-five :: Program
-five = callFresh $ \x -> equiv x $ Atom "5"
-
-fives_ :: Term -> Program
-fives_ x = disj (equiv x $ Atom "5") (zzz $ fives_ x)
-
-fives :: Program
-fives = callFresh fives_
-
-fivesRev_ :: Term -> Program
-fivesRev_ x = disj (zzz $ fivesRev_ x) (equiv x $ Atom "5")
-
-fivesRev :: Program
-fivesRev = callFresh fivesRev_
-
-a_and_b :: Program
-a_and_b = conj
-          (callFresh $ \a -> equiv a $ Atom "7")
-          (callFresh $ \b -> disj (equiv b $ Atom "5") (equiv b $ Atom "6"))
-
-runTest :: Program -> [State]
-runTest p = klistToList $ p empty_state
-
-
--- | = reify
---
--- To the extent possible, I copied this code from the original Scheme paper.
---
--- TODO : Reification seems broken:
-  -- > mK_reify $ runTest $ conj five six
-  -- [Atom "5"]
-  -- > runTest $ conj five six
-  -- [([(1,Atom "6"),(0,Atom "5")],2)]
-
-walk' :: Term -> Subst -> Term
-walk' t s = let v = walk t s
-  in case v of Pair p q -> Pair (walk' p s) (walk' q s)
-               _        -> v
-
-mK_reify :: Functor f => f State -> f Term
-mK_reify = fmap reify_head
-
-reify_head :: State ->  Term -- TODO (#safe) accept Subst, not State
-reify_head (s,_) = let v = walk' (Var 0) s
-  in walk' v $ reify_s v []
-
-reify_s :: Term -> Subst -> Subst
-reify_s t s = let t' = walk t s in case t' of
-  Var v    -> let n = reify_name $ length s
-              in (v, Atom n) : s
-  Pair p q -> reify_s q $ reify_s p s
-  _        -> s
-
-reify_name :: Int -> String
-reify_name i = "_." ++ show i
