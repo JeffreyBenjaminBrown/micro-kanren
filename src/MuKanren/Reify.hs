@@ -8,7 +8,8 @@
 
 module MuKanren.Reify where
 
-import MuKanren.Main
+import MuKanren.Types
+import MuKanren.Logic
 
 
 walk' :: Term -> Subst -> Term

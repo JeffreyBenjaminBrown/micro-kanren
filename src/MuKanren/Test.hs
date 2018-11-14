@@ -1,6 +1,7 @@
 module MuKanren.Test where
 
-import MuKanren.Main
+import MuKanren.Types
+import MuKanren.Logic
 
 
 empty_state :: State -- ^ The first variable used is always 0.
