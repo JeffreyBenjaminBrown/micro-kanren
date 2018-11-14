@@ -7,9 +7,9 @@ import Control.Monad
 import qualified Data.Map as M
 
 
-type Var = Int
-type Subst = [(Var, Term)]
-type State = (Subst, Int) -- ^ TODO (#grok) Int because not a Var yet?
+type Var     = Int
+type Subst   = [(Var, Term)]
+type State   = (Subst, Int) -- ^ TODO (#grok) Int because not a Var yet?
 type Program = State -> KList State -- ^ the paper calls `Program`s "goals"
 
 -- | From the paper: "terms of the language consist of variables, objects
@@ -28,9 +28,9 @@ data KList a = Nil | Cons a (KList a) | Delay (KList a)
   deriving (Show, Eq, Ord)
 
 instance Functor KList where
-  fmap _ Nil = Nil
+  fmap _ Nil         = Nil
   fmap f (Cons a as) = Cons (f a) $ fmap f as
-  fmap f (Delay as) = Delay $ fmap f as
+  fmap f (Delay as)  = Delay $ fmap f as
 
 instance Applicative KList where
   pure a = Cons a Nil
